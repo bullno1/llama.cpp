@@ -54,6 +54,7 @@ extern "C" {
     //
 
     struct llama_context;
+    struct llama_state;
 
     typedef int llama_token;
 
@@ -143,8 +144,17 @@ extern "C" {
                              const char * path_model,
             struct llama_context_params   params);
 
+    // Init the model without an attached state.
+    // Use llama_init_state to create a state.
+    LLAMA_API struct llama_context * llama_init_from_file_no_state(
+                             const char * path_model,
+            struct llama_context_params   params);
+
+    LLAMA_API struct llama_state * llama_init_state(struct llama_context * ctx);
+
     // Frees all allocated memory
     LLAMA_API void llama_free(struct llama_context * ctx);
+    LLAMA_API void llama_free_state(struct llama_state * ctx);
 
     // Returns 0 on success
     LLAMA_API int llama_model_quantize(
@@ -165,10 +175,18 @@ extern "C" {
                              int   n_threads);
 
     // Returns the number of tokens in the KV cache
-    LLAMA_API int llama_get_kv_cache_token_count(const struct llama_context * ctx);
+    LLAMA_API int llama_get_kv_cache_token_count           (const struct llama_context * ctx);
+    LLAMA_API int llama_get_kv_cache_token_count_from_state(const struct llama_state * state);
 
     // Sets the current rng seed.
-    LLAMA_API void llama_set_rng_seed(struct llama_context * ctx, int seed);
+    LLAMA_API void llama_set_rng_seed(
+            struct llama_context * ctx,
+                             int   seed);
+
+    LLAMA_API void llama_set_rng_seed_with_state(
+            struct llama_context * ctx,
+              struct llama_state * state,
+                             int   seed);
 
     // Returns the maximum size in bytes of the state (rng, logits, embedding
     // and kv_cache) - will often be smaller after compacting tokens
@@ -178,14 +196,41 @@ extern "C" {
     // Destination needs to have allocated enough memory.
     // Returns the number of bytes copied
     LLAMA_API size_t llama_copy_state_data(struct llama_context * ctx, uint8_t * dst);
+    LLAMA_API size_t llama_save_state_data(struct llama_state * state, uint8_t * dst);
 
     // Set the state reading from the specified address
     // Returns the number of bytes read
     LLAMA_API size_t llama_set_state_data(struct llama_context * ctx, uint8_t * src);
+    LLAMA_API size_t llama_load_state_data(struct llama_state * state, uint8_t * dst);
 
     // Save/load session file
-    LLAMA_API bool llama_load_session_file(struct llama_context * ctx, const char * path_session, llama_token * tokens_out, size_t n_token_capacity, size_t * n_token_count_out);
-    LLAMA_API bool llama_save_session_file(struct llama_context * ctx, const char * path_session, const llama_token * tokens, size_t n_token_count);
+    LLAMA_API bool llama_load_session_file(
+            struct llama_context * ctx,
+                      const char * path_session,
+                     llama_token * tokens_out,
+                          size_t   n_token_capacity,
+                          size_t * n_token_count_out);
+
+    LLAMA_API bool llama_load_session_file_with_state(
+            struct llama_context * ctx,
+              struct llama_state * state,
+                      const char * path_session,
+                     llama_token * tokens_out,
+                          size_t   n_token_capacity,
+                          size_t * n_token_count_out);
+
+    LLAMA_API bool llama_save_session_file(
+            struct llama_context * ctx,
+                      const char * path_session,
+               const llama_token * tokens,
+                          size_t   n_token_count);
+
+    LLAMA_API bool llama_save_session_file_with_state(
+            struct llama_context * ctx,
+              struct llama_state * state,
+                      const char * path_session,
+               const llama_token * tokens,
+                          size_t   n_token_count);
 
     // Run the llama inference to obtain the logits and probabilities for the next token.
     // tokens + n_tokens is the provided batch of new tokens to process
@@ -193,6 +238,14 @@ extern "C" {
     // Returns 0 on success
     LLAMA_API int llama_eval(
             struct llama_context * ctx,
+               const llama_token * tokens,
+                             int   n_tokens,
+                             int   n_past,
+                             int   n_threads);
+
+    LLAMA_API int llama_eval_with_state(
+            struct llama_context * ctx,
+              struct llama_state * state,
                const llama_token * tokens,
                              int   n_tokens,
                              int   n_past,
@@ -226,10 +279,12 @@ extern "C" {
     // Rows: n_tokens
     // Cols: n_vocab
     LLAMA_API float * llama_get_logits(struct llama_context * ctx);
+    LLAMA_API float * llama_get_logits_from_state(struct llama_state * state);
 
     // Get the embeddings for the input
     // shape: [n_embd] (1-dimensional)
     LLAMA_API float * llama_get_embeddings(struct llama_context * ctx);
+    LLAMA_API float * llama_get_embeddings_from_state(struct llama_state * state);
 
     // Token Id -> String. Uses the vocabulary in the provided context
     LLAMA_API const char * llama_token_to_str(const struct llama_context * ctx, llama_token token);
